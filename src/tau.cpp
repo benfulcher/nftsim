@@ -1,7 +1,8 @@
 /** @file tau.cpp
-  @brief A brief, one sentence description.
+  @brief Definition of Tau, which handles the activity history.
 
-  A more detailed multiline description...
+  Tau objects are used to retrieve the appropriate delayed activity when the
+  discrete time delay \f$\tau_{ab}\f$ is nonzero.
 
   @author Peter Drysdale, Felix Fung,
 */
@@ -13,11 +14,12 @@
 #include "configf.h"    // Configf;
 
 // C++ standard library headers
-#include <cmath>    // std::remainder;
-#include <iomanip>  // std::setprecision;
-#include <iostream> // std::cerr; std::endl; std::scientific;
-#include <limits>   // std::numeric_limits::max_digits10
-#include <vector>   // std::vector;
+#include <algorithm> // std::any_of;
+#include <cmath>     // std::remainder;
+#include <iomanip>   // std::setprecision;
+#include <iostream>  // std::cerr; std::endl; std::scientific;
+#include <limits>    // std::numeric_limits::max_digits10
+#include <vector>    // std::vector;
 using std::cerr;
 using std::endl;
 using std::remainder;
@@ -25,6 +27,7 @@ using std::scientific;
 using std::setprecision;
 using std::vector;
 
+/// Initialises Tau::m by reading from a `.conf` file, setting Tau::max accordingly.
 void Tau::init( Configf& configf ) {
   vector<double> temp = configf.numbers();
   if( temp.size() == 1 ) {
@@ -48,13 +51,12 @@ void Tau::init( Configf& configf ) {
         max = m[i];
       }
     }
-    if( remainder(temp[0], deltat) != 0.0 ) {
-      int full_precision = std::numeric_limits<double>::max_digits10;
-      cerr << "WARNING: Value of Tau not divisible by Deltat!\n"
+    // Warn if any provided Tau values are not exact integer multiples of deltat
+    if ( std::any_of(temp.begin(), temp.end(), [this](double x){return remainder(x, deltat) != 0.0;}) ) {
+      //int full_precision = std::numeric_limits<double>::max_digits10;
+      cerr << "WARNING: One or more values of Tau not divisible by Deltat!\n"
            << "  It is recommended that Tau be specified as an exact integer\n"
-           << "  multiple of Deltat. For example, your simulation will be run using:\n"
-           << "    Tau[0]: " << scientific << setprecision(full_precision)
-                             << m[0]*deltat
+           << "  multiple of Deltat."
            << endl;
       //exit(EXIT_FAILURE);
     }

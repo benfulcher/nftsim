@@ -74,7 +74,8 @@ The role of \NF is to integrate neural field equations to predict neural activit
     \item For each object, specify the parameter values.
 \end{enumerate}
 
-This users guide covers the obtaining and setting up (Sec.~\ref{sec:obtain}), configuring (Sec.~\ref{sec:config}) and launching of \NF (Sec.~\ref{sec:running}), as well as postprocessing (Sec.~\ref{sec:analysis}) and tips and tricks (Sec.~\ref{sec:tips}).
+This user guide covers how to obtain and set-up \NF (Sec.~\ref{sec:obtain}), how to configure (Sec.~\ref{sec:config}) and launch a simulation (Sec.~\ref{sec:running}), as well as some possible postprocessing of the output (Sec.~\ref{sec:analysis}).
+It concludes with a section on development, that is, things you need to know if you intend to extend the core functionality of \NF (Sec.~\ref{sec:dev}).
 
 Within this documentation, specific terminology as appeared in the computer is in \type{typewriter font}. Commands are denoted as
 \begin{lstlisting}
@@ -328,7 +329,7 @@ Population 1: Stimulation
     \begin{lstlisting}
 Length: .5
     \end{lstlisting}
-    The physical edge length of the population (which is a 2D sheet), in metres. This is used in \type{Wave} propagators and the \type{PSD} of \type{White} stimulus.
+    The physical edge length of the population (which is a 2D sheet), in metres. This is used in \type{Wave} propagators and the \type{ASD} of \type{White} stimulus.
     \item
     \begin{lstlisting}
 Stimulus: Const - Onset: 0
@@ -377,12 +378,12 @@ Sine - Amplitude: 1.0 Frequency: 2.0
 White - Mean: 1 StdDev: 20 Ranseed: 10
     \end{lstlisting}
 
-    Alternatively, the power spectral density (PSD) may be specified instead of the standard deviation (StdDev). The advantage is that the PSD is invariant to change in \type{Deltat}, population \type{Length} and spatial \type{Nodes}. Given the PSD, \NF correctly calculates the standard deviation:
+    Alternatively, the amplitude spectral density (ASD), which is the square root of the power spectral density (PSD) may be specified instead of the standard deviation (StdDev). The advantage of using ASD is that NFTsim will preserve the ASD under changes in \type{Deltat}, population \type{Length} and spatial \type{Nodes}. Given the ASD, \NF  calculates the standard deviation:
     \begin{lstlisting}
-White - Mean: 1 PSD: 20 Ranseed: 10
+White - Mean: 1 ASD: 20 Ranseed: 10
     \end{lstlisting}
 
-    In general, it is preferable to specify the noise using \texttt{PSD} rather than \texttt{StdDev}. 
+    In general, it is preferable to specify the noise amplitude using \texttt{ASD} rather than \texttt{StdDev}. Note that the ASD reported in paper is given assuming the power spectrum is calculated with respect to angular frequency $\omega$, instead of linear frequency $f$. ASD($f$) is larger than ASD($\omega$) by a factor of $2\pi$ (i.e.\ ASD($f$)=$2\pi$*ASD($\omega$)).
 
     The random number generator may be specified in \type{Ranseed}. If a seed is not specified, an automatically-incremented seed will be used instead, so that multiple stimulus populations will have independent sequences. In general it is not necessary to set the seed manually unless different random numbers are required for otherwise identical runs.
 
@@ -392,7 +393,7 @@ White - Mean: 1 PSD: 20 Ranseed: 10
     To superimpose 2 or more stimuli, begin with the keyword \type{Superimpose}, followed by the number of stimuli. Then list all the stimulus patterns and their parameters, with each stimulus pattern preceded by the keyword \type{Stimulus}.
     \begin{lstlisting}
 Stimulus: Superimpose: 2
- Stimulus: White - Mean: 1 PSD: 1
+ Stimulus: White - Mean: 1 ASD: 1
  Stimulus: PulseRect - Onset: 0.5 Width: 2e-2 Frequency 1 Pulses: 1
     \end{lstlisting}
 
@@ -796,6 +797,7 @@ Finally, if you run \NF with multiple nodes, it typically solves the system of e
 One important task is computing the power spectrum as predicted by the linearized analytic equations. This can be achieved using \type{nf.spatial\_spectrum} which takes in an \type{nf} object and computes the power spectrum integrated over $k$ taking into account volume conduction.
 
 \section{Development}
+\label{sec:dev}
 
 This section provides programming information about \NF for development extension and core logic. This section assumes a basic knowledge of \type{ANSI C++}, including object oriented programming, usage of template, and standard template library (STL). As our development takes place within a Git repository, a working knowledge of Git will significantly help.
 
@@ -842,7 +844,7 @@ To maintain consistency within the \NF code base, we strongly encourage you to a
 
 When using the \type{C++} standard library, use the \type{using} directive to explicitly indicate the components you are using. For example,
 
-\begin{lstlisting}
+\begin{lstlisting}[language=C++]
 #include<vector>
 using std::vector;
 \end{lstlisting}
@@ -946,7 +948,7 @@ Implementing a new class may be done using the following procedure:
     \item Identifying the core class to inherit (see above tables). Then look up the documentation of the appropriate base class from Sec.~\ref{sec:pop}--\ref{sec:dendrite}.
     \item Decide on the name of the class. Generally, it may be advantageous for the new name to refer to the base name, plus a terse description. For example, \type{LongCoupling} refers to its base class \type{Coupling}, with the additional description indicating that the new class has long range coupling. The file names should be the same as the class name, but all in lower case, for consistency.
     \item Overload appropriately the \type{init()} (see Sec.~\ref{sec:init}), \type{output()} (see Sec.~\ref{sec:output}), and \type{step()} functions. {\bf Do not} copy and paste code. Rather, use
-        \begin{lstlisting}
+        \begin{lstlisting}[language=C++]
 BaseClass::function();
         \end{lstlisting}
     which will utilize the existing function in the base class. This will ensure that your derived class is updated if the base class changes.
@@ -1013,7 +1015,7 @@ Object \type{Tau} provides the axonal delay latency of propagator.
 For spatially inhomogeneous propagators, class \type{Stencil} provides a Moore grid, as documented in Sec.~\ref{sec:stencil}.
 
 To ``register" your propagator, look for the
-\begin{lstlisting}
+\begin{lstlisting}[language=C++]
 // PUT YOUR PROPAGATORS HERE
 \end{lstlisting}
 subsection in \type{solver.cpp}.
@@ -1030,7 +1032,7 @@ The \type{Coupling} class provides a constant references to both presynaptic and
 Function \type{excite()} indicates whether this is an excitatory coupling. Protected variable \type{pos} is $+1$ or $-1$, depending on the sign of \(\nu_{ab}\).
 
 To ``register" your coupling, look for the
-\begin{lstlisting}
+\begin{lstlisting}[language=C++]
 // PUT YOUR COUPLINGS HERE
 \end{lstlisting}
 subsection in \type{solver.cpp}.
@@ -1044,7 +1046,7 @@ Object \type{dendrites} is an array of presynaptic \type{Dendrite}.
 Objects \type{glu\_m} and \type{glu\_rk4} calculates glutamate concentration in the synaptic cleft, which is accessed via \type{glu()}.
 
 To ``register" your firing response, look for the
-\begin{lstlisting}
+\begin{lstlisting}[language=C++]
 // PUT YOUR FIRING_RESPONSE HERE
 \end{lstlisting}
 subsection in \type{population.cpp}.
@@ -1056,7 +1058,7 @@ To implement new stimulus pattern, inherit from class \type{Timeseries}, where \
 The time is provided via the variable \type{t}.
 
 To ``register" your stimulus, look for the
-\begin{lstlisting}
+\begin{lstlisting}[language=C++]
 // PUT YOUR TIMEFUNCTION HERE
 \end{lstlisting}
 subsection in \type{timeseries.cpp}.
@@ -1069,7 +1071,7 @@ To implement new dendritic responses, inherit from class \type{Dendrite}.
 References are provided for the presynaptic coupling and propagator.
 
 To ``register" your dendritic response, look for the
-\begin{lstlisting}
+\begin{lstlisting}[language=C++]
 // PUT YOUR DENDRITE HERE
 \end{lstlisting}
 subsection in \type{firing\_response.cpp}.
@@ -1096,7 +1098,7 @@ Wave - Range: 80e-3 velocity: 9.28
 \end{lstlisting}
 
 Then, we may use this pattern with \type{optional()} to achieve the desired effect:
-\begin{lstlisting}
+\begin{lstlisting}[language=C++]
 configf.param("Range",range);
 if( !configf.optional("gamma",gamma) ) {
   double temp; configf.param("velocity",temp);
@@ -1110,7 +1112,7 @@ if( !configf.optional("gamma",gamma) ) {
 \NF outputs field variables at every timestep, where the user chooses which object to output via the configuration file, and the object chooses which fields to output in the \type{output()} function.
 
 To output field solutions, overload \type{NF::output()} to write
-\begin{lstlisting}
+\begin{lstlisting}[language=C++]
 output.prefix("Object Name",index+1);
 output("field1",field1);
 output("field2",field2);
@@ -1119,18 +1121,18 @@ subobject2.output(output);
 BaseClass::output(output);
 \end{lstlisting}
 or for a single output field,
-\begin{lstlisting}
+\begin{lstlisting}[language=C++]
 output("Object Name",index+1,"field1",field1);
 \end{lstlisting}
 
 where \type{field1}, and \type{field2} are \type{vector<double>} with size equal to the number of spatial nodes.
 
 To output a single number, as opposed to a spatial field, use the function
-\begin{lstlisting}
+\begin{lstlisting}[language=C++]
 output.singleNode("Object Name",index+1,"field1",field1);
 \end{lstlisting}
 or
-\begin{lstlisting}
+\begin{lstlisting}[language=C++]
 output.singleNode("field1",field1);
 \end{lstlisting}
 where \type{field1} is a \type{vector<double>} of size 1.
@@ -1166,7 +1168,7 @@ with
 being an algebraic equation.
 
 This can be defined in \type{NewDE::rhs()} as
-\begin{lstlisting}
+\begin{lstlisting}[language=C++]
 void NewDE::rhs( const vector<double>& y, vector<double>& dydt )
 {
   // y = { F, x, dxdt }
@@ -1178,17 +1180,17 @@ void NewDE::rhs( const vector<double>& y, vector<double>& dydt )
 where the comments are strongly recommended for readability.
 
 Declare the number of differential equations (in this example, 3) in the constructor
-\begin{lstlisting}
+\begin{lstlisting}[language=C++]
 NewDE( int nodes, double deltat ) : DE(nodes,deltat,3) {}
 \end{lstlisting}
 
 To integrate \type{NewDE}, declare a pair of \type{DE} and \type{RK4} objects:
-\begin{lstlisting}
+\begin{lstlisting}[language=C++]
 NewDE de(nodes,deltat);
 RK4 rk4(de);
 \end{lstlisting}
 then the differential equation may be solved via (usually done in \type{Class::step()})
-\begin{lstlisting}
+\begin{lstlisting}[language=C++]
 for( int i=0; i<nodes; i++ )
   de[0][i] = F; // algebraic equation
 rk4.step();     // integrate differential equation by one step
@@ -1200,7 +1202,7 @@ Since \type{NewClass} has access to all members of \type{NewDE}, all initializat
 
 Remember to redirect the interface and output variables to members of \type{NewDE}. For example,
 
-\begin{lstlisting}
+\begin{lstlisting}[language=C++]
 vector<double>& NewClass::x(void) const
 {
   // original code from base class:
@@ -1210,7 +1212,7 @@ vector<double>& NewClass::x(void) const
 }
 \end{lstlisting}
 
-\begin{lstlisting}
+\begin{lstlisting}[language=C++]
 void NewClass::output( Output& output ) const
 {
   output.prefix("NewClass",index+1);
@@ -1229,14 +1231,14 @@ To extend an existing \type{DE} class, for example extend \type{NewDE} to \type{
 Class \type{Stencil} provides Moore grid for spatially inhomogeneous calculations.
 
 Given a stencil,
-\begin{lstlisting}
+\begin{lstlisting}[language=C++]
 Stencil stencil(nodes,longside,"Torus");
 \end{lstlisting}
 
 Use \type{operator=} to set the spatial field values of a \type{vector<double>}.
 
 The stencil pointer can be set and get via the \type{set()} and \type{get()} functions, and incremented via \type{operator++}. The Moore grid can be read with
-\begin{lstlisting}
+\begin{lstlisting}[language=C++]
 stencil(nw); stencil(n); stencil(ne);
 stencil( w); stencil(c); stencil( e);
 stencil(sw); stencil(s); stencil(se);

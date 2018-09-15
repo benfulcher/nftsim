@@ -248,7 +248,6 @@ namespace TIMESERIES {
     // Set default values for optional parameters.
     period = inf; // Time between the start of each pulse [s].
     pulses = 1.0; // Maximum number of pulses.
-    sigma = 0.03125; // Width of transition.
     configf.param("Amplitude", amp);
     configf.param("Width", width);
     if( !configf.optional("Period", period) ) {
@@ -257,15 +256,35 @@ namespace TIMESERIES {
         period = 1.0 / freq;
       }
     }
+
     configf.optional("Pulses", pulses);
-    configf.optional("Sigma", sigma);
-    pulse_count = min(pulses, duration/period);
+
+    if (!configf.optional("Sigma", sigma)){
+      // Set an adaptive default width of transition. A sigmoidal-pulse
+      // waveform is achieved when sigma is a small fraction of width.
+      // However, to be represented properly it must be at least deltat.
+      sigma = max(width / 16.0, deltat);
+    }
+
+    if( (duration != inf) && (period != inf) ) {
+      pulse_count = min(pulses, duration/period);
+    } else {
+      pulse_count = pulses;
+    }
+
+    if( (pulse_count > 1) && (period == inf) ) {
+      cerr << "ERROR: Multiple PulseSigmoid pulses requested but no Period or Frequency specified."
+           << endl;
+      exit(EXIT_FAILURE);
+    }
 
     first_pulse_mid = onset + (width / 2.0);
 
-    onset_midpoints.assign(pulse_count, 0.0);
-    for( size_type i=0; i<pulse_count; i++ ) {
-      onset_midpoints[i] = onset + (i * period);
+    onset_midpoints.assign(pulse_count, onset);
+    if( pulse_count > 1 ) {
+      for( size_type i=1; i<pulse_count; ++i ) {
+        onset_midpoints[i] = onset + (i * period);
+      }
     }
 
     // As we need to begin evaluation before onset for this Timeseries, as
@@ -273,7 +292,9 @@ namespace TIMESERIES {
     // we reset the time-series' internal time to zero and adjust the duration
     // accordingly.
     t = 0.0;
-    duration = duration + onset;
+    if( duration != inf ) {
+      duration = duration + onset;
+    }
   }
 
   /** @brief Generate a train of sigmoidal pulses.*/
@@ -319,18 +340,19 @@ namespace TIMESERIES {
   /** @brief Initialises white noise.*/
   void White::init( Configf& configf ) {
     // Mean: 1 StdDev: 1 Ranseed: 1
-    // Mean: 1 PSD: 1 Ranseed: 1
+    // Mean: 1 ASD: 1e-05 Ranseed: 1
+    // ASD stands for Amplitude Spectral Density, which is the square root of PSD (Power Spectral Density)
     configf.param("Mean", mean);
     if( !configf.optional("StdDev", stddev) ) {
-      configf.param("PSD", psd);
+      configf.param("ASD", asd);
       // index of timeseries the same as that of population
 
       if(nodes>1) {
         deltax = atof(configf.find(
                         label("Population ",index+1)+"*Length").c_str()) /sqrt(nodes);
-        stddev = sqrt(4.0*pow(M_PI,3)*pow(psd,2)/deltat/pow(deltax,2));
+        stddev = sqrt(2.0*4.0*pow(M_PI,3)*pow(asd,2)/deltat/pow(deltax,2));
       } else {
-        stddev = sqrt(M_PI*pow(psd,2)/deltat);
+        stddev = sqrt(2.0*M_PI*pow(asd,2)/deltat);
       }
 
     }
@@ -352,14 +374,14 @@ namespace TIMESERIES {
   /** @brief Initialises spatially uniform/coherent white noise.*/
   void WhiteCoherent::init( Configf& configf ) {
     // Mean: 1 StdDev: 1 Ranseed: 1
-    // Mean: 1 PSD: 1 Ranseed: 1
+    // Mean: 1 ASD: 1e-05 1 Ranseed: 1
     configf.param("Mean", mean);
     if( !configf.optional("StdDev", stddev) ) {
-      configf.param("PSD", psd);
+      configf.param("ASD", asd);
       // index of timeseries the same as that of population
       double deltax = atof(configf.find(
                              label("Population ",index+1)+"*Length").c_str()) /sqrt(nodes);
-      stddev = sqrt(4.0*pow(M_PI,3.0)*pow(psd,2)/deltat/pow(deltax,2));
+      stddev = sqrt(2.0*4.0*pow(M_PI,3.0)*pow(asd,2)/deltat/pow(deltax,2));
     }
     if(configf.optional("Ranseed", seed)) {
       random = new Random(seed, mean, stddev);
