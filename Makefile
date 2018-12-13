@@ -28,16 +28,17 @@ GREP := egrep
 CAT := cat
 
 # Standard Linux (gcc must be >= 4.8.5) performance
-ifeq ($(shell uname -s), Linux)
-  CXX := g++
+ifeq ($(shell uname -s), Darwin) #Linux)
+  CXX := g++-8
   CXXFLAGS := -std=c++11 -lm -Wall -Wextra -pedantic -msse -msse2 -msse3 -mfpmath=sse -march=native -mtune=native -funroll-loops -flto -O3
   DEBUG := -std=c++11 -ggdb3 -Og -lm -Wall -Wextra -pedantic -msse -msse2 -msse3 -mfpmath=sse -march=native -mtune=native -funroll-loops
   DEPFLAGS = -std=c++11 -MM -MP -MT $(OBJDIR)$*.o
 endif
 
 # Mac OS, default to clang++
-ifeq ($(shell uname -s), Darwin)
-  CXX := clang++
+ifeq ($(shell uname -s), NotDarwin)
+  # CXX := clang++
+  CXX := g++-8
   CXXFLAGS := -std=c++11 -Wall -Wno-padded -Wno-c++98-compat -Wno-c++98-compat-pedantic -fdiagnostics-fixit-info -Wdocumentation -march=native -funroll-loops -flto -O3
   DEBUG := -std=c++11 -g -Weverything -Wno-c++98-compat -Wno-c++98-compat-pedantic -fdiagnostics-fixit-info -Wdocumentation
   DEPFLAGS = -std=c++11 -MM -MP -MT $(OBJDIR)$*.o
